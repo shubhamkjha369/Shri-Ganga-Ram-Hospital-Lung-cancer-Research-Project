@@ -1,0 +1,18 @@
+{
+  "project": "SGRH-Lung Cancer",
+  "latest_version": "v002_eda_and_knowledge_graph",
+  "versions": [
+    {
+      "version": "v001_initial",
+      "created_at": "2026-11-23T17:08:08.891460",
+      "description": "Initial baseline raw data snapshot.",
+      "manifest_path": "v001_initial/manifest.json"
+    },
+    {
+      "version": "v002_eda_and_knowledge_graph",
+      "created_at": "2026-11-23T17:19:04.385225",
+      "description": "EDA notebook execution and knowledge graph generation snapshot.",
+      "manifest_path": "v002_eda_and_knowledge_graph/manifest.json"
+    }
+  ]
+}
