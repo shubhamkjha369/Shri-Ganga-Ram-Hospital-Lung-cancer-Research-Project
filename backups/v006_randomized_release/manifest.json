@@ -41,6 +41,6 @@
       "status": "verified_match"
     }
   ],
-  "git_commit": null,
+  "git_commit": "2a2577f88ded75a603725bea6a9fed3224ea1980",
   "validation_status": "verified_randomized_and_executed"
 }
