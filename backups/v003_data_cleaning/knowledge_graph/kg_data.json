@@ -1,0 +1,293 @@
+{
+  "project": "SGRH-Lung Cancer",
+  "dataset": "ICI.xlsx",
+  "version": "1.0.0",
+  "last_updated": "2026-11-23T17:15:38.072407",
+  "provenance": {
+    "raw_file": "data/raw/ICI.xlsx",
+    "file_size_bytes": 96786,
+    "sha256": "e19a9838f55ed4a7890c743a9d6ac03d12b3b82d6fb53de9ea1db0d02eff3496",
+    "backup_snapshot": "backups/v001_initial/data/raw/ICI.xlsx",
+    "cohort_description": "Cohort of 64 lung cancer patients treated with immune checkpoint inhibitor (ICI) therapy, categorized into Responders (R=34) vs Non-Responders (NR=30) at Sir Ganga Ram Hospital (SGRH)."
+  },
+  "entities": [
+    {
+      "id": "COHORT_001",
+      "type": "Cohort",
+      "name": "SGRH Lung Cancer ICI Cohort",
+      "attributes": {
+        "n_patients": 64,
+        "n_features": 144,
+        "cancer_site": "Lung",
+        "stages": [
+          "III (n=39)",
+          "IV (n=25)"
+        ],
+        "regime": "High-dimensional p >> n (p=144, n=64, ratio=2.25)"
+      }
+    },
+    {
+      "id": "DRUG_NIVO",
+      "type": "TherapeuticEntity",
+      "name": "Nivolumab",
+      "class": "Anti-PD-1 Monoclonal Antibody",
+      "patients_count": 38,
+      "percentage": 59.38
+    },
+    {
+      "id": "DRUG_PEMBRO",
+      "type": "TherapeuticEntity",
+      "name": "Pembrolizumab",
+      "class": "Anti-PD-1 Monoclonal Antibody",
+      "patients_count": 26,
+      "percentage": 40.62
+    },
+    {
+      "id": "TARGET_RESPONSE",
+      "type": "OutcomeEntity",
+      "name": "ICI Response Label",
+      "classes": {
+        "R": {
+          "count": 34,
+          "label": "Responder",
+          "percentage": 53.125
+        },
+        "NR": {
+          "count": 30,
+          "label": "Non-responder",
+          "percentage": 46.875
+        }
+      }
+    },
+    {
+      "id": "SURV_PFS",
+      "type": "SurvivalEndpoint",
+      "name": "Progression-Free Survival",
+      "unit": "Days",
+      "median": 141.0,
+      "range": [
+        16,
+        1404
+      ]
+    },
+    {
+      "id": "SURV_OS",
+      "type": "SurvivalEndpoint",
+      "name": "Overall Survival",
+      "unit": "Days",
+      "median": 257.0,
+      "range": [
+        19,
+        1300
+      ]
+    },
+    {
+      "id": "BIOM_PDL1",
+      "type": "BiomarkerEntity",
+      "name": "PDL-1 Expression",
+      "nature": "Binned / Trimodal (0%, 30%, 60%)",
+      "association_with_response": {
+        "p_value": 6.27e-12,
+        "fdr_q": 6.33e-10,
+        "trend": "Strongly elevated in Responders (median 60% vs 0%)"
+      }
+    },
+    {
+      "id": "BIOM_TMB",
+      "type": "BiomarkerEntity",
+      "name": "Tumor Mutational Burden",
+      "nature": "Continuous mutations/Mb",
+      "median_R": 13.5,
+      "median_NR": 3.15,
+      "association_with_response": {
+        "p_value": 6.95e-06,
+        "fdr_q": 0.000234,
+        "trend": "Significantly higher in Responders"
+      }
+    },
+    {
+      "id": "METAB_PANEL",
+      "type": "AssayPanel",
+      "name": "Metabolomics 5-Plex",
+      "markers": [
+        "Thio-Urea",
+        "Gentisic acid",
+        "Sphingosine 1-phosphate",
+        "glutathione",
+        "4-Hydroxy-butanone"
+      ],
+      "characteristics": "Mass spectrometry intensity, right-skewed, severe run-order signal drift"
+    },
+    {
+      "id": "PROT_PANEL",
+      "type": "AssayPanel",
+      "name": "Immuno-Oncology 92-Plex Proteomics",
+      "markers_count": 92,
+      "range": [
+        -2.5413,
+        12.7431
+      ],
+      "nature": "Normalized Protein Expression (NPX), log2 scale, zero missing values"
+    }
+  ],
+  "data_quality_issues": [
+    {
+      "id": "ISSUE_01_PFS_OS_LOGIC",
+      "severity": "CRITICAL_CLINICAL",
+      "title": "PFS exceeds OS in 4 patients",
+      "description": "Biologically and clinically, PFS <= OS by definition. 4 patients have PFS strictly greater than OS.",
+      "affected_patients": [
+        {
+          "sample_id": 1,
+          "PFS_days": 58,
+          "OS_days": 19,
+          "delta_days": 39
+        },
+        {
+          "sample_id": 21,
+          "PFS_days": 41,
+          "OS_days": 33,
+          "delta_days": 8
+        },
+        {
+          "sample_id": 28,
+          "PFS_days": 72,
+          "OS_days": 41,
+          "delta_days": 31
+        },
+        {
+          "sample_id": 53,
+          "PFS_days": 1404,
+          "OS_days": 1265,
+          "delta_days": 139
+        }
+      ],
+      "impact": "Distorts survival curves and Cox proportional hazards regression if uncorrected.",
+      "recommendation": "Cross-reference medical charts to verify date of progression vs date of death/last follow-up."
+    },
+    {
+      "id": "ISSUE_02_RUN_ORDER_BATCH_DRIFT",
+      "severity": "CRITICAL_METHODOLOGICAL",
+      "title": "Run-order instrument drift perfectly confounded with outcome-sorted cohort",
+      "description": "Spreadsheet is sorted largely by outcome (Samples 1-20 are NR; Samples 43-64 are R). Metabolomics and proteomics exhibit profound monotonic run-order drift (e.g. Thio-Urea Spearman r = -0.85 within R, r = -0.76 within NR; glutathione r = +0.76 within R, r = +0.70 within NR).",
+      "impact": "High risk of false-positive biomarker discovery and naive ML models learning run sequence rather than biological etiology.",
+      "recommendation": "Apply run-order detrending / LOESS / batch-correction methods; require random shuffling in CV; do not allow sample ID or row index into any model."
+    },
+    {
+      "id": "ISSUE_03_DIET_SURVEY_CONTRADICTION",
+      "severity": "HIGH_DATA_ENTRY",
+      "title": "Diet survey contradiction: 31 patients recorded as both Veg and Non-veg",
+      "description": "31 patients have Veg. == 1 AND non-veg. == 1. In addition, Sample 40 has non-veg recorded as string '1`' (backtick typo).",
+      "impact": "Cannot treat Veg and Non-veg as mutually exclusive binary variables.",
+      "recommendation": "Recode non-veg '1`' to 1; collapse diet into a unified categorical feature: Vegetarian (Veg=1, NonVeg=0, n=28), Non-Vegetarian (NonVeg=1, n=36), or verify survey wording."
+    },
+    {
+      "id": "ISSUE_04_BMI_CALC_ERRORS",
+      "severity": "MEDIUM_DATA_ENTRY",
+      "title": "Discrepancy between recorded BMI and weight/(height/100)^2",
+      "description": "8 patients have |BMI_rec - BMI_calc| > 1.0 kg/m2. Pt 39 has Height 180cm, Weight 70kg, calc BMI = 21.60 kg/m2, but recorded BMI = 29 (+7.40 error).",
+      "impact": "Misclassifies patient weight status (normal weight vs overweight/obese).",
+      "recommendation": "Recompute BMI as a standardized float feature: weight / (height/100)^2."
+    },
+    {
+      "id": "ISSUE_05_SEX_TYPO",
+      "severity": "LOW_DATA_ENTRY",
+      "title": "Whitespace in sex column creating 3 distinct categories",
+      "description": "Sample 10 has sex recorded as 'F ' with a trailing whitespace, leading to categories ['M' (42), 'F' (21), 'F ' (1)].",
+      "impact": "Unstripped string splits female patients into two separate dummy variables.",
+      "recommendation": "Apply str.strip() across all string columns."
+    },
+    {
+      "id": "ISSUE_06_WHITESPACE_COLUMN_NAMES",
+      "severity": "LOW_DATA_HYGIENE",
+      "title": "22 columns contain trailing whitespace in header names",
+      "description": "Headers such as 'sample ', 'Hypertension ', 'SMOKING ', 'CANCER/TYPE ', 'TOTAL LEUCOCYTES COUNT .1', etc.",
+      "impact": "Causes silent KeyError bugs and fragile script referencing.",
+      "recommendation": "Strip and standardize column names into snake_case or clean alphanumeric names."
+    },
+    {
+      "id": "ISSUE_07_HISTOLOGY_AMBIGUITY",
+      "severity": "MEDIUM_CLINICAL",
+      "title": "Histology classification non-mutually exclusive and incomplete",
+      "description": "Across 64 patients, 49 have exactly 1 histology flag, 8 have 2 flags (e.g. Adeno + Squamous), and 7 have 0 flags. CANCER/TYPE is binary 0 (39) vs 1 (25) but not documented.",
+      "impact": "Ambiguous tumor subtyping in multivariate regression.",
+      "recommendation": "Clarify meaning of CANCER/TYPE and establish consensus histology label per patient."
+    },
+    {
+      "id": "ISSUE_08_STAGE_METASTASIS_DISCREPANCY",
+      "severity": "LOW_CLINICAL",
+      "title": "Stage III patient flagged with Metastasis = 1",
+      "description": "Sample 22 is recorded as DISEASE STAGE III but Metastasis == 1. In AJCC staging, distant metastasis defines Stage IV.",
+      "impact": "Inconsistency in clinical stage categorization.",
+      "recommendation": "Verify whether metastasis refers to nodal/locoregional vs distant metastasis for Patient 22."
+    },
+    {
+      "id": "ISSUE_09_CBC_PERCENTAGE_SUM_ANOMALIES",
+      "severity": "MEDIUM_LAB_DATA",
+      "title": "Differential leukocyte percentage sums deviate substantially from 100%",
+      "description": "Sum of Neutrophils + Lymphocytes + Monocytes + Eosinophils ranges from 61.2% to 129.0% at baseline, and 79.9% to 159.6% post-therapy. Basophils are omitted.",
+      "impact": "Inflated differential percentages distort relative hematologic interpretations.",
+      "recommendation": "Use absolute leukocyte counts where possible, or normalize differentials to 100%."
+    },
+    {
+      "id": "ISSUE_10_HIGH_DIMENSIONAL_REGIME",
+      "severity": "HIGH_METHODOLOGICAL",
+      "title": "Extreme risk of overfitting in p >> n regime (p=144, n=64)",
+      "description": "Ratio of features to samples is 2.25:1. Standard classification models will rapidly overfit without strict regularization.",
+      "impact": "Inflated cross-validation scores, lack of generalizability.",
+      "recommendation": "Use nested cross-validation, ElasticNet / Lasso penalty, feature screening based on domain knowledge, and PCA/UMAP."
+    }
+  ],
+  "relations": [
+    {
+      "from": "COHORT_001",
+      "to": "DRUG_NIVO",
+      "type": "RECEIVES_THERAPY",
+      "count": 38
+    },
+    {
+      "from": "COHORT_001",
+      "to": "DRUG_PEMBRO",
+      "type": "RECEIVES_THERAPY",
+      "count": 26
+    },
+    {
+      "from": "COHORT_001",
+      "to": "TARGET_RESPONSE",
+      "type": "EVALUATED_FOR"
+    },
+    {
+      "from": "COHORT_001",
+      "to": "SURV_PFS",
+      "type": "MONITORED_BY"
+    },
+    {
+      "from": "COHORT_001",
+      "to": "SURV_OS",
+      "type": "MONITORED_BY"
+    },
+    {
+      "from": "BIOM_PDL1",
+      "to": "TARGET_RESPONSE",
+      "type": "STRONGLY_ASSOCIATED_WITH",
+      "p_value": 6.27e-12
+    },
+    {
+      "from": "BIOM_TMB",
+      "to": "TARGET_RESPONSE",
+      "type": "ASSOCIATED_WITH",
+      "p_value": 6.95e-06
+    },
+    {
+      "from": "METAB_PANEL",
+      "to": "ISSUE_02_RUN_ORDER_BATCH_DRIFT",
+      "type": "EXHIBITS_ARTIFACT"
+    },
+    {
+      "from": "SURV_PFS",
+      "to": "ISSUE_01_PFS_OS_LOGIC",
+      "type": "VIOLATES_CONSTRAINT_WITH",
+      "target": "SURV_OS"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "project": "SGRH-Lung Cancer",
-  "latest_version": "v002_eda_and_knowledge_graph",
+  "latest_version": "v004_cleaned_data_release",
   "versions": [
     {
       "version": "v001_initial",
@@ -14,6 +14,19 @@
       "description": "EDA notebook execution and knowledge graph generation snapshot.",
       "manifest_path": "v002_eda_and_knowledge_graph/manifest.json",
       "git_commit": "028697262062a9b36e32db2af3c01fdd85866f9a"
+    },
+    {
+      "version": "v003_data_cleaning",
+      "created_at": "2026-11-23T18:01:04.468623",
+      "description": "Pre-cleaning and processing snapshot.",
+      "manifest_path": "v003_data_cleaning/manifest.json",
+      "git_commit": "a177a69"
+    },
+    {
+      "version": "v004_cleaned_data_release",
+      "created_at": "2026-11-23T18:04:15.128561",
+      "description": "Cleaned analysis-ready dataset and pipeline release.",
+      "manifest_path": "v004_cleaned_data_release/manifest.json"
     }
   ]
 }
