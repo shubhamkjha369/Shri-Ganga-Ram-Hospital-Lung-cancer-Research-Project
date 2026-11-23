@@ -1,0 +1,34 @@
+{
+  "project": "SGRH-Lung Cancer",
+  "version": "v005_pre_randomization",
+  "created_at": "2026-11-23T18:11:42.305185",
+  "description": "Pre-randomization snapshot of ICI_cleaned files before shuffling rows to remove ascending sample/outcome bias.",
+  "files": [
+    {
+      "relative_path": "data/raw/ICI_cleaned.xlsx",
+      "size_bytes": 74904,
+      "sha256": "fd0246d1be296ad5081ce1628ba234513d6e67d836a209a34800919758212d15",
+      "status": "verified_match"
+    },
+    {
+      "relative_path": "data/processed/ICI_cleaned.xlsx",
+      "size_bytes": 74904,
+      "sha256": "fd0246d1be296ad5081ce1628ba234513d6e67d836a209a34800919758212d15",
+      "status": "verified_match"
+    },
+    {
+      "relative_path": "data/processed/ICI_cleaned.csv",
+      "size_bytes": 72197,
+      "sha256": "749d501294989c0e33ebf0c3a755adb591fae2bc856572752a9935cc1e80b920",
+      "status": "verified_match"
+    },
+    {
+      "relative_path": "scripts/clean_data.py",
+      "size_bytes": 23460,
+      "sha256": "0f62c4808a30d5e5c080a24cef4a31a306145067e673f07a3050040cdd321221",
+      "status": "verified_match"
+    }
+  ],
+  "git_commit": "463b6b5",
+  "validation_status": "pre_randomization_verified"
+}

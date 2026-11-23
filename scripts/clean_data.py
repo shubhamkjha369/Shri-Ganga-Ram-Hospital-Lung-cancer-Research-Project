@@ -5,9 +5,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-def clean_ici_dataset(project_root=r'c:\Users\SAM\Documents\GitHub\SGRH-Lung Cancer'):
+def clean_ici_dataset(project_root=r'c:\Users\SAM\Documents\GitHub\SGRH-Lung Cancer', randomize_rows=True, seed=42):
     raw_file = os.path.join(project_root, 'data', 'raw', 'ICI.xlsx')
     processed_dir = os.path.join(project_root, 'data', 'processed')
+    raw_dir = os.path.join(project_root, 'data', 'raw')
     os.makedirs(processed_dir, exist_ok=True)
     
     # 1. Load raw dataset in read-only mode
@@ -334,16 +335,25 @@ def clean_ici_dataset(project_root=r'c:\Users\SAM\Documents\GitHub\SGRH-Lung Can
     assert set(df_clean['sex'].unique()) == {'M', 'F'}, "Sex contains invalid categories!"
     assert set(df_clean['response_binary'].unique()) == {0, 1}, "Response binary is invalid!"
     
+    # Optional row randomization to eliminate ascending sample/outcome order bias
+    if randomize_rows:
+        print(f"Randomizing row order (seed={seed}) to eliminate sequential outcome bias...")
+        df_clean = df_clean.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+        print(f"First 5 randomized sample_ids: {df_clean['sample_id'].iloc[:5].tolist()}")
+        print(f"First 5 randomized response_labels: {df_clean['response_label'].iloc[:5].tolist()}")
+
     # --- K. EXPORT DATASETS ---
     xlsx_processed = os.path.join(processed_dir, 'ICI_cleaned.xlsx')
     csv_processed = os.path.join(processed_dir, 'ICI_cleaned.csv')
     xlsx_data_root = os.path.join(project_root, 'data', 'ICI_cleaned.xlsx')
+    xlsx_raw_dir = os.path.join(raw_dir, 'ICI_cleaned.xlsx')
     dict_file = os.path.join(processed_dir, 'data_dictionary.json')
     
     # Save Excel and CSV
     df_clean.to_excel(xlsx_processed, index=False)
     df_clean.to_csv(csv_processed, index=False)
     df_clean.to_excel(xlsx_data_root, index=False)
+    df_clean.to_excel(xlsx_raw_dir, index=False)
     
     # Save Data Dictionary
     with open(dict_file, 'w', encoding='utf-8') as f:
@@ -352,6 +362,7 @@ def clean_ici_dataset(project_root=r'c:\Users\SAM\Documents\GitHub\SGRH-Lung Can
     print(f"Cleaned Excel saved to: {xlsx_processed}")
     print(f"Cleaned CSV saved to: {csv_processed}")
     print(f"Root Excel copy saved to: {xlsx_data_root}")
+    print(f"Raw directory copy saved to: {xlsx_raw_dir}")
     print(f"Data Dictionary saved to: {dict_file}")
     
     return df_clean

@@ -177,8 +177,45 @@ plt.tight_layout()
 plt.show()
 """))
 
-# Cell 8: Final Sanity Check & Summary
-cells.append(nbf.v4.new_markdown_cell("""## 7. Final Dataset Sanity Check & Machine Learning Readiness"""))
+# Cell 8: Row Randomization & Bias Elimination Check
+cells.append(nbf.v4.new_markdown_cell("""## 7. Row Randomization & Order Bias Elimination
+### The Bias:
+In the raw data, rows were in strict ascending order of `sample_id` (1 to 64), which was also sorted by response (Rows 1–20 were 100% Non-Responders; Rows 43–64 were 100% Responders).
+
+### The Solution:
+Rows in `ICI_cleaned` were randomized using a reproducible pseudorandom permutation (`seed=42`). Below we verify that:
+1. All 64 original patient records are preserved.
+2. Response outcomes are evenly distributed across the entire dataset.
+"""))
+
+cells.append(nbf.v4.new_code_cell("""print("First 10 sample_ids in cleaned dataset:", df_clean['sample_id'].iloc[:10].tolist())
+print("First 10 response_labels in cleaned dataset:", df_clean['response_label'].iloc[:10].tolist())
+
+# Chunk distribution
+c1 = df_clean.iloc[:20]['response_label'].value_counts().to_dict()
+c2 = df_clean.iloc[20:42]['response_label'].value_counts().to_dict()
+c3 = df_clean.iloc[42:]['response_label'].value_counts().to_dict()
+
+print(f"\\nChunk 1 (Rows 1-20):   {c1}")
+print(f"Chunk 2 (Rows 21-42):  {c2}")
+print(f"Chunk 3 (Rows 43-64):  {c3}")
+
+# Visualize outcome distribution across row sequence
+fig, ax = plt.subplots(figsize=(12, 3))
+colors = df_clean['response_label'].map({'R': '#2ecc71', 'NR': '#e74c3c'})
+ax.bar(range(len(df_clean)), [1]*len(df_clean), color=colors, width=0.8)
+ax.set_title('Cleaned Dataset Row Sequence by Response Outcome (Evenly Distributed)')
+ax.set_xlabel('Row Index in ICI_cleaned (0 to 63)')
+ax.set_yticks([])
+from matplotlib.patches import Patch
+legend_elements = [Patch(facecolor='#2ecc71', label='Responder (R)'), Patch(facecolor='#e74c3c', label='Non-Responder (NR)')]
+ax.legend(handles=legend_elements, loc='upper right')
+plt.tight_layout()
+plt.show()
+"""))
+
+# Cell 9: Final Sanity Check & Summary
+cells.append(nbf.v4.new_markdown_cell("""## 8. Final Dataset Sanity Check & Machine Learning Readiness"""))
 cells.append(nbf.v4.new_code_cell("""print("=== FINAL DATASET SANITY REPORT ===")
 print(f"Total Rows: {len(df_clean)}")
 print(f"Total Columns: {len(df_clean.columns)}")
