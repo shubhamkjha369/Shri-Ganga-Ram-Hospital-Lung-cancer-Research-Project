@@ -41,3 +41,17 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Office and editor temporary lock files
+~$*
+*.tmp
+
+# Scratch and temporary logs
+scratch/
+*.log
+
+# User-specified ignored project assets (local only, do not upload to git)
+backups/
+knowledge_graph/
+scripts/
+notebooks/generate_*.py
