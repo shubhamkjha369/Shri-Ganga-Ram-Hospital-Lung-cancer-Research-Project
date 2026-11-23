@@ -12,7 +12,8 @@
       "version": "v002_eda_and_knowledge_graph",
       "created_at": "2026-11-23T17:19:04.385225",
       "description": "EDA notebook execution and knowledge graph generation snapshot.",
-      "manifest_path": "v002_eda_and_knowledge_graph/manifest.json"
+      "manifest_path": "v002_eda_and_knowledge_graph/manifest.json",
+      "git_commit": "028697262062a9b36e32db2af3c01fdd85866f9a"
     }
   ]
 }
