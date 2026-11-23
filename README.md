@@ -67,6 +67,40 @@ SGRH-Lung Cancer/
    - **Global Biomarker Importance:** Small-Molecule Metabolomics (`4-Hydroxy-butanone`), Tumor Genomics (`PD-L1 TPS`, `TMB`, `TMB x PD-L1 interaction`), and Circulating Proteomics (`TNF`, `PD-L2`, `IL-15`).
    - **Biomarker Synergies:** High TMB coupled with suppressed circulating PD-L2 identified patients with sustained remission; preserved glutathione combined with on-treatment NLR drop identified the longest overall survival subgroup.
 
+## Clinical AI Web Application (Streamlit & Docker)
+
+A production-grade clinical decision support web application is provided for real-time patient triage, automated cleaning, multi-omic feature engineering, top-2 model consensus inference, SHAP biological explainability, and post-treatment survival projection.
+
+### Run Locally with Streamlit
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Launch application
+streamlit run app.py
+```
+App will be accessible at: `http://localhost:8501`
+
+### Deploy with Docker & Docker Compose
+
+```bash
+# Build and run with Docker
+docker build -t sgrh-immunopredict .
+docker run -d -p 8501:8501 --name sgrh_app sgrh-immunopredict
+
+# Or run with Docker Compose
+docker compose up -d
+```
+
+### Application Features
+- **Automated Clinical Ingestion:** Upload `.xlsx` or `.csv` spreadsheets; automatically runs header hygiene, fuzzy matching, $PFS > OS$ inversion reconciliation, and BMI recalculation.
+- **Top-2 Pre-Trained Models:** Real-time consensus prediction combining ElasticNet ($L_1/L_2$) and Sparse Random Forest.
+- **Patient-Level SHAP Waterfall:** Individual feature impact showing doctors why a patient is classified as Responder or Non-Responder.
+- **Biomarker Dynamics:** Explains key biological changes (NLR ratio changes, 4-Hydroxy-butanone, checkpoint target accessibility).
+- **Survival Milestones:** Predicts expected median PFS, OS, and 6-/12-month survival probabilities.
+- **Clinical Data Export:** One-click download of the complete processed decision matrix in Microsoft Excel (`.xlsx`).
+
 ## Reproducibility & Environment
 
 Analyses were conducted in Python 3.11 with `lifelines`, `scikit-learn`, `shap`, `lightgbm`, `statsmodels`, `pandas`, `seaborn`, `openpyxl`, and `matplotlib`. All executable notebooks can be reproduced end-to-end.

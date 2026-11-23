@@ -1,0 +1,27 @@
+# Version control
+.git
+.gitignore
+
+# Backups and local archives
+backups/
+knowledge_graph/
+notebooks/
+scripts/
+
+# Python cache & environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and scratch
+*.log
+scratch/
