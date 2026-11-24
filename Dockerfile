@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application artifacts, serialized models, and demo data
+COPY assets/ ./assets/
 COPY models/ ./models/
 COPY data/raw/ICI.xlsx ./data/raw/ICI.xlsx
 COPY pipeline.py .

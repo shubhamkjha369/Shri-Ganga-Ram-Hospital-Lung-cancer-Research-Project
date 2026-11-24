@@ -16,10 +16,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pipeline import ClinicalPipeline
 
+# Assets and branding configuration
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+SGRH_LOGO_PATH = os.path.join(ASSETS_DIR, "sgrh_logo.png")
+PAGE_FAVICON = SGRH_LOGO_PATH if os.path.exists(SGRH_LOGO_PATH) else "🧬"
+
 # Page configuration
 st.set_page_config(
     page_title="SGRH ImmunoPredict | Precision ICI Oncology",
-    page_icon="🧬",
+    page_icon=PAGE_FAVICON,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -125,7 +130,10 @@ pipeline = load_pipeline()
 # SIDEBAR CONTROLS & FILE UPLOADER
 # =========================================================================
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/dna-helix.png", width=64)
+    if os.path.exists(SGRH_LOGO_PATH):
+        st.image(SGRH_LOGO_PATH, width=80)
+    else:
+        st.image("https://img.icons8.com/fluency/96/dna-helix.png", width=64)
     st.title("SGRH ImmunoPredict")
     st.caption("Sir Ganga Ram Hospital Precision Oncology")
     st.markdown("---")

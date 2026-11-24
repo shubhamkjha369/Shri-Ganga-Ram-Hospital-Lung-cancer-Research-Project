@@ -5,6 +5,9 @@
 # Backups and local archives
 backups/
 knowledge_graph/
+manuscript/
+preprint/
+pre-print/
 notebooks/
 scripts/
 
