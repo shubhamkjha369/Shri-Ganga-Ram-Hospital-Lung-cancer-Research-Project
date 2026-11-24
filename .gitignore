@@ -59,3 +59,12 @@ notebooks/generate_*.py
 # Data formatting rules: strictly Excel (.xlsx), ignore any CSV files
 *.csv
 
+# Manuscript and pre-print drafts (strictly local only - do not upload to git)
+manuscript/
+preprint/
+pre-print/
+*.aux
+*.out
+*.synctex.gz
+
+
