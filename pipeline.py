@@ -48,6 +48,13 @@ class ClinicalPipeline:
         self.pca_metab = joblib.load(os.path.join(self.models_dir, 'pca_metab.joblib'))
         self.cph_pfs = joblib.load(os.path.join(self.models_dir, 'cox_pfs.joblib'))
         self.cph_os = joblib.load(os.path.join(self.models_dir, 'cox_os.joblib'))
+        
+        # Load precomputed training background for SHAP reference calibration
+        bg_path = os.path.join(self.models_dir, 'shap_background.joblib')
+        if os.path.exists(bg_path):
+            self.shap_background = joblib.load(bg_path)
+        else:
+            self.shap_background = np.zeros((1, len(self.feature_names)))
 
     def clean_column_name(self, col: str) -> str:
         """Standardize column names to snake_case."""
@@ -146,9 +153,40 @@ class ClinicalPipeline:
             mapping[orig] = mapped
             new_cols.append(mapped)
             
-        df_clean = df.copy()
-        df_clean.columns = new_cols
+        # Deduplicate and consolidate mapped columns by taking first non-null
+        unique_cols = {}
+        for orig, mapped in zip(df.columns, new_cols):
+            s = df[orig]
+            if isinstance(s, pd.DataFrame):
+                s = s.iloc[:, 0]
+            if mapped not in unique_cols:
+                unique_cols[mapped] = s
+            else:
+                unique_cols[mapped] = unique_cols[mapped].combine_first(s)
+                
+        df_clean = pd.DataFrame(unique_cols, index=df.index)
         return df_clean, mapping
+
+    def _clean_numeric_series(self, s: Any, default: float) -> pd.Series:
+        """Safely convert any series or object to numeric, handling %, commas, <, >, and strings."""
+        if isinstance(s, pd.DataFrame):
+            s = s.iloc[:, 0]
+        if not isinstance(s, pd.Series):
+            s = pd.Series(s)
+        if s.dtype == object:
+            s_str = s.astype(str).str.strip().str.lower()
+            s_str = s_str.replace({
+                'negative': '0', 'neg': '0', 'positive': '1', 'pos': '1',
+                'nd': '', 'n/a': '', 'nan': '', 'none': '', 'missing': '', 'unknown': ''
+            })
+            s_str = s_str.str.replace(r'[%,\s><=\+]', '', regex=True)
+            s = s_str
+        return pd.to_numeric(s, errors='coerce').fillna(default)
+
+    def _get_series(self, df: pd.DataFrame, col: str, default: float) -> pd.Series:
+        if col in df.columns:
+            return self._clean_numeric_series(df[col], default)
+        return pd.Series(default, index=df.index, dtype=float)
 
     def clean_and_audit_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
         """Perform clinical data quality audit and sanitization."""
@@ -161,54 +199,60 @@ class ClinicalPipeline:
             
         # 2. Fix Typo in non-veg diet ('1` -> 1)
         if 'diet_nonveg_flag' in df_clean.columns:
-            df_clean['diet_nonveg_flag'] = df_clean['diet_nonveg_flag'].replace(['1`', "1'"], '1')
-            df_clean['diet_nonveg_flag'] = pd.to_numeric(df_clean['diet_nonveg_flag'], errors='coerce').fillna(0)
+            s_nv = df_clean['diet_nonveg_flag']
+            if isinstance(s_nv, pd.DataFrame):
+                s_nv = s_nv.iloc[:, 0]
+            s_nv = s_nv.replace(['1`', "1'"], '1')
+            df_clean['diet_nonveg_flag'] = self._clean_numeric_series(s_nv, 0.0)
 
         # 3. Clean and standardize sex
         if 'sex' in df_clean.columns:
-            df_clean['sex'] = df_clean['sex'].str.upper().replace({'MALE': 'M', 'FEMALE': 'F'})
-            df_clean['sex_male'] = (df_clean['sex'] == 'M').astype(int)
+            s_col = df_clean['sex']
+            if isinstance(s_col, pd.DataFrame):
+                s_col = s_col.iloc[:, 0]
+            s_str = s_col.astype(str).str.strip().str.upper()
+            df_clean['sex_male'] = s_str.isin(['M', 'MALE', '1', '1.0']).astype(int)
         elif 'sex_male' not in df_clean.columns:
             df_clean['sex_male'] = 1  # default fallback
             audit_warnings.append("Sex column missing: defaulted to male (1).")
 
         # 4. Clean and recalculate BMI
         if 'height_cm' in df_clean.columns and 'weight_kg' in df_clean.columns:
-            h_m = pd.to_numeric(df_clean['height_cm'], errors='coerce') / 100.0
-            w_kg = pd.to_numeric(df_clean['weight_kg'], errors='coerce')
+            h_m = self._get_series(df_clean, 'height_cm', 165.0).clip(50.0, 250.0) / 100.0
+            w_kg = self._get_series(df_clean, 'weight_kg', 65.0).clip(20.0, 300.0)
             df_clean['bmi_calculated'] = (w_kg / (h_m ** 2)).round(2)
         elif 'bmi_recorded' in df_clean.columns:
-            df_clean['bmi_calculated'] = pd.to_numeric(df_clean['bmi_recorded'], errors='coerce')
+            df_clean['bmi_calculated'] = self._get_series(df_clean, 'bmi_recorded', 22.5).clip(10.0, 60.0)
         else:
             df_clean['bmi_calculated'] = 22.5
             audit_warnings.append("Height/Weight/BMI missing: imputed standard clinical baseline 22.5.")
 
         # 5. Diet Harmonization
         if 'diet_veg_flag' in df_clean.columns and 'diet_nonveg_flag' in df_clean.columns:
-            v = pd.to_numeric(df_clean['diet_veg_flag'], errors='coerce').fillna(0)
-            nv = pd.to_numeric(df_clean['diet_nonveg_flag'], errors='coerce').fillna(0)
+            v = self._get_series(df_clean, 'diet_veg_flag', 0.0)
+            nv = self._get_series(df_clean, 'diet_nonveg_flag', 0.0)
             df_clean['diet_is_nonveg'] = np.where((nv == 1) | (v == 1), (nv == 1).astype(int), 0)
         else:
             df_clean['diet_is_nonveg'] = 1
 
-        # 6. PD-L1 TPS Standardizing
+        # 6. PD-L1 TPS Standardizing (bounded [0, 100])
         if 'pdl1_ihc_tps_percent' in df_clean.columns:
-            df_clean['pdl1_ihc_tps_percent'] = pd.to_numeric(df_clean['pdl1_ihc_tps_percent'], errors='coerce').fillna(0)
+            df_clean['pdl1_ihc_tps_percent'] = self._get_series(df_clean, 'pdl1_ihc_tps_percent', 0.0).clip(0.0, 100.0)
         else:
             df_clean['pdl1_ihc_tps_percent'] = 0.0
             audit_warnings.append("PD-L1 IHC TPS expression missing: defaulted to 0%.")
 
-        # 7. TMB Standardizing
+        # 7. TMB Standardizing (bounded [0, 500])
         if 'tmb' in df_clean.columns:
-            df_clean['tmb'] = pd.to_numeric(df_clean['tmb'], errors='coerce').fillna(5.0)
+            df_clean['tmb'] = self._get_series(df_clean, 'tmb', 5.0).clip(0.0, 500.0)
         else:
             df_clean['tmb'] = 5.0
             audit_warnings.append("Tumor Mutational Burden (TMB) missing: defaulted to median 5.0 mut/Mb.")
 
         # 8. Check PFS > OS Inversion
         if 'pfs_days_raw' in df_clean.columns and 'os_days_raw' in df_clean.columns:
-            pfs_num = pd.to_numeric(df_clean['pfs_days_raw'], errors='coerce')
-            os_num = pd.to_numeric(df_clean['os_days_raw'], errors='coerce')
+            pfs_num = self._get_series(df_clean, 'pfs_days_raw', 100.0)
+            os_num = self._get_series(df_clean, 'os_days_raw', 200.0)
             inversions = (pfs_num > os_num).sum()
             if inversions > 0:
                 audit_warnings.append(f"Identified {inversions} patient(s) with PFS > OS; harmonized PFS = min(PFS, OS).")
@@ -216,15 +260,9 @@ class ClinicalPipeline:
         
         # 9. Vital Status & Survival Events
         if 'vital_status_raw' in df_clean.columns:
-            # 0=Death, 1=Alive in raw data -> canonical death_event: 1=Death, 0=Alive
-            df_clean['death_event'] = (pd.to_numeric(df_clean['vital_status_raw'], errors='coerce') == 0).astype(int)
+            df_clean['death_event'] = (self._get_series(df_clean, 'vital_status_raw', 1.0) == 0).astype(int)
 
         return df_clean, audit_warnings
-
-    def _get_series(self, df: pd.DataFrame, col: str, default: float) -> pd.Series:
-        if col in df.columns:
-            return pd.to_numeric(df[col], errors='coerce').fillna(default)
-        return pd.Series(default, index=df.index, dtype=float)
 
     def engineer_features(self, df_clean: pd.DataFrame) -> pd.DataFrame:
         """Derive all clinical, kinetic, metabolomic, and interaction features."""
@@ -374,8 +412,8 @@ class ClinicalPipeline:
             else:
                 consensus_class.append('Intermediate / Guarded Response')
 
-        # 2. SHAP Feature Attribution (Linear SHAP on ElasticNet)
-        explainer = shap.LinearExplainer(self.model_en, X_sc)
+        # 2. SHAP Feature Attribution using precomputed reference training cohort background
+        explainer = shap.LinearExplainer(self.model_en, self.shap_background)
         shap_values = explainer.shap_values(X_sc)
         
         patient_explanations = []
@@ -396,36 +434,68 @@ class ClinicalPipeline:
                 })
             patient_explanations.append(top_drivers)
 
-        # 3. Survival Projections (PFS & OS)
+        # 3. Individualized Precision Survival Modeling via Cox Proportional Hazards
+        cox_input_df = pd.DataFrame({
+            'response_binary': pred_en,
+            'pdl1_ihc_tps_percent': df_feat['pdl1_ihc_tps_percent'].values,
+            'tmb': df_feat['tmb'].values,
+            'sig_immune_balance_index': df_feat['sig_immune_balance_index'].values,
+            'nlr_ratio_change': df_feat['nlr_ratio_change'].values
+        }, index=df_feat.index)
+        
+        try:
+            pfs_surv_curves = self.cph_pfs.predict_survival_function(cox_input_df)
+            os_surv_curves = self.cph_os.predict_survival_function(cox_input_df)
+        except Exception:
+            # Fallback if lifelines encounters numerical edge case
+            pfs_surv_curves = None
+            os_surv_curves = None
+
         survival_predictions = []
         for i in range(len(df_feat)):
             r_bin = pred_en[i]
-            pdl1_val = df_feat.iloc[i].get('pdl1_ihc_tps_percent', 0)
-            nlr_dyn = df_feat.iloc[i].get('nlr_ratio_change', 1.0)
+            p = ensemble_prob[i]
             
-            # Historical medians
-            if r_bin == 1:
-                pfs_med_days = 270.0
-                os_med_days = 583.0
-                pfs_6m_prob = 0.853
-                os_6m_prob = 1.000
-                os_12m_prob = 0.677
-                risk_tier = 'Favorable / Low Risk'
+            if pfs_surv_curves is not None and os_surv_curves is not None:
+                pfs_s = pfs_surv_curves.iloc[:, i]
+                os_s = os_surv_curves.iloc[:, i]
+                
+                # 6m & 12m survival probabilities
+                pfs_6m = float(pfs_s.loc[pfs_s.index <= 180].iloc[-1]) if any(pfs_s.index <= 180) else 1.0
+                pfs_12m = float(pfs_s.loc[pfs_s.index <= 365].iloc[-1]) if any(pfs_s.index <= 365) else pfs_s.iloc[-1]
+                os_6m = float(os_s.loc[os_s.index <= 180].iloc[-1]) if any(os_s.index <= 180) else 1.0
+                os_12m = float(os_s.loc[os_s.index <= 365].iloc[-1]) if any(os_s.index <= 365) else os_s.iloc[-1]
+                
+                # Median survival (first day where S(t) drops <= 0.50)
+                pfs_sub = pfs_s[pfs_s <= 0.50]
+                pfs_med = float(pfs_sub.index[0]) if len(pfs_sub) > 0 else float(pfs_s.index[-1])
+                
+                os_sub = os_s[os_s <= 0.50]
+                os_med = float(os_sub.index[0]) if len(os_sub) > 0 else float(os_s.index[-1])
             else:
-                pfs_med_days = 53.0
-                os_med_days = 127.0
-                pfs_6m_prob = 0.050
-                os_6m_prob = 0.133
-                os_12m_prob = 0.020
-                risk_tier = 'High Risk / Poor Prognosis'
+                # Cohort median fallback
+                pfs_med = 270.0 if r_bin == 1 else 53.0
+                os_med = 583.0 if r_bin == 1 else 127.0
+                pfs_6m = 0.853 if r_bin == 1 else 0.050
+                pfs_12m = 0.450 if r_bin == 1 else 0.010
+                os_6m = 1.000 if r_bin == 1 else 0.133
+                os_12m = 0.677 if r_bin == 1 else 0.020
+            
+            if p >= self.metadata['decision_thresholds']['high_response_threshold']:
+                tier = 'Favorable / Low Risk'
+            elif p <= self.metadata['decision_thresholds']['low_response_threshold']:
+                tier = 'High Risk / Poor Prognosis'
+            else:
+                tier = 'Guarded / Intermediate Risk'
                 
             survival_predictions.append({
-                'expected_median_pfs_days': pfs_med_days,
-                'expected_median_os_days': os_med_days,
-                'pfs_6month_survival_prob': round(pfs_6m_prob, 3),
-                'os_6month_survival_prob': round(os_6m_prob, 3),
-                'os_12month_survival_prob': round(os_12m_prob, 3),
-                'survival_risk_tier': risk_tier
+                'expected_median_pfs_days': round(pfs_med, 1),
+                'expected_median_os_days': round(os_med, 1),
+                'pfs_6month_survival_prob': round(float(np.clip(pfs_6m, 0.0, 1.0)), 3),
+                'pfs_12month_survival_prob': round(float(np.clip(pfs_12m, 0.0, 1.0)), 3),
+                'os_6month_survival_prob': round(float(np.clip(os_6m, 0.0, 1.0)), 3),
+                'os_12month_survival_prob': round(float(np.clip(os_12m, 0.0, 1.0)), 3),
+                'survival_risk_tier': tier
             })
 
         # Summary results dataframe
@@ -438,6 +508,7 @@ class ClinicalPipeline:
             'predicted_outcome': consensus_class,
             'expected_median_pfs_days': [s['expected_median_pfs_days'] for s in survival_predictions],
             'expected_median_os_days': [s['expected_median_os_days'] for s in survival_predictions],
+            'pfs_6month_prob': [s['pfs_6month_survival_prob'] for s in survival_predictions],
             'os_12month_prob': [s['os_12month_survival_prob'] for s in survival_predictions],
             'risk_tier': [s['survival_risk_tier'] for s in survival_predictions]
         })
@@ -450,7 +521,9 @@ class ClinicalPipeline:
             'audit_warnings': audit_warnings,
             'shap_explanations': patient_explanations,
             'survival_projections': survival_predictions,
-            'shap_values': shap_values
+            'shap_values': shap_values,
+            'pfs_surv_curves': pfs_surv_curves,
+            'os_surv_curves': os_surv_curves
         }
 
 

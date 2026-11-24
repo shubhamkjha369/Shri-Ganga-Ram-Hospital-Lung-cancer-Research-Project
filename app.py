@@ -330,9 +330,29 @@ with tab1:
         # Survival Predictions
         st.markdown("**Expected Clinical Survival Milestones:**")
         s_c1, s_c2 = st.columns(2)
-        s_c1.info(f"**Expected Median PFS:** {pt_res['expected_median_pfs_days']} days ({round(pt_res['expected_median_pfs_days']/30.4, 1)} months)")
-        s_c2.success(f"**Expected Median OS:** {pt_res['expected_median_os_days']} days ({round(pt_res['expected_median_os_days']/30.4, 1)} months)")
+        s_c1.info(f"**Expected Median PFS:** {pt_res['expected_median_pfs_days']} days ({round(pt_res['expected_median_pfs_days']/30.4, 1)} months) | **6m PFS:** {round(pt_res.get('pfs_6month_prob', 0)*100, 1)}%")
+        s_c2.success(f"**Expected Median OS:** {pt_res['expected_median_os_days']} days ({round(pt_res['expected_median_os_days']/30.4, 1)} months) | **12m OS:** {round(pt_res.get('os_12month_prob', 0)*100, 1)}%")
         
+        # Individual Patient Survival Curve Plot
+        if output.get('pfs_surv_curves') is not None and output.get('os_surv_curves') is not None:
+            pfs_curve = output['pfs_surv_curves'].iloc[:, selected_idx]
+            os_curve = output['os_surv_curves'].iloc[:, selected_idx]
+            fig_surv = go.Figure()
+            fig_surv.add_trace(go.Scatter(x=pfs_curve.index, y=pfs_curve.values, mode='lines', name='PFS (Progression-Free)', line=dict(color='#2563EB', width=2.5)))
+            fig_surv.add_trace(go.Scatter(x=os_curve.index, y=os_curve.values, mode='lines', name='OS (Overall Survival)', line=dict(color='#059669', width=2.5)))
+            fig_surv.add_hline(y=0.5, line_dash='dash', line_color='#94A3B8', annotation_text='50% Median Survival')
+            fig_surv.update_layout(
+                title=f"Individual Projected Survival Function S(t) for {pt_res['sample_id']}",
+                xaxis_title="Time (Days from Treatment Initiation)",
+                yaxis_title="Survival Probability S(t)",
+                yaxis_range=[0, 1.05],
+                height=240,
+                margin=dict(l=20, r=20, t=35, b=20),
+                plot_bgcolor='rgba(0,0,0,0)',
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_surv, use_container_width=True)
+            
         st.markdown('</div>', unsafe_allow_html=True)
         
     with p_col2:
